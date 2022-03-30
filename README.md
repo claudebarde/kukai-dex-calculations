@@ -1,6 +1,6 @@
 # kukai-dex-calculations
 
-> This library is a fork of this [library](https://github.com/kukai-wallet/kukai-dex-calculations). The main difference is that this library uses the `BigNumber` library instead of the `BigInt` library.
+> This library is a fork of this [library](https://github.com/kukai-wallet/kukai-dex-calculations). The main difference is that this library uses the `BigNumber` library instead of the `BigInt` library to make interactions with Taquito easier.
 
 This library is a fork of the nomadic labs [library](https://gitlab.com/sophiagold/dexter-calculations/-/tree/liquidity_baking/) (which is itself a fork of the dexter calculations library made by camlCase) for performing the calculations necessary to complete swaps, add and remove liquidity against the Liquidity Baking contract. This copy has been slightly modified to be more generic. The fees, percentage of burn and whether or not to take into account the liquidity baking subsidy, have all been made parameters passed into functions rather than hardcoded. The number of decimals the destination / source token has, has also been added to the functions.
 
