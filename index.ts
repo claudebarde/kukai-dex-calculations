@@ -1,24 +1,18 @@
+"use strict";
 import BigNumber from "bignumber.js";
 
 type numericInput = BigNumber | number | string;
 
-const dexterCalculations = (function (undefined) {
-  "use strict";
+export default class DexCalculations {
+  isLbContract: boolean;
 
-  /**
-   * Many functions use {(BigNumber|number|string)} as parameter. These parameters
-   * are converted into bigInt from the big-integer package and are expected to
-   * to be non-negative numbers. string should be a string encoded integer. If you
-   * are interfacing this project from another programming language, you should
-   * pass the value for the parameter in {(BigNumber|number|string)} as a string to
-   * avoid number size restrictions in JavaScript.
-   */
-
-  /**
-   * =============================================================================
-   * Internal utility functions
-   * =============================================================================
-   */
+  constructor(isLbContract?: boolean) {
+    if (isLbContract) {
+      this.isLbContract = isLbContract;
+    } else {
+      this.isLbContract = false;
+    }
+  }
 
   /**
    * Test if a bigInt is greater than zero.
@@ -26,7 +20,7 @@ const dexterCalculations = (function (undefined) {
    * @param {BigNumber} x
    * @returns {boolean} x > 0
    */
-  function gtZero(x: BigNumber): boolean {
+  gtZero(x: BigNumber): boolean {
     return x.isGreaterThan(new BigNumber(0));
   }
 
@@ -36,7 +30,7 @@ const dexterCalculations = (function (undefined) {
    * @param {BigNumber} x
    * @returns {boolean} x >= 0
    */
-  function geqZero(x: BigNumber): boolean {
+  geqZero(x: BigNumber): boolean {
     return x.isGreaterThanOrEqualTo(new BigNumber(0));
   }
 
@@ -46,7 +40,7 @@ const dexterCalculations = (function (undefined) {
    * @param {BigNumber} x
    * @returns {boolean} x == 0
    */
-  function eqZero(x: BigNumber): boolean {
+  eqZero(x: BigNumber): boolean {
     return x.isZero();
   }
 
@@ -56,7 +50,7 @@ const dexterCalculations = (function (undefined) {
    * @param {BigNumber} x
    * @returns {boolean} x <= 0
    */
-  function leqZero(x: BigNumber): boolean {
+  leqZero(x: BigNumber): boolean {
     return x.isLessThanOrEqualTo(new BigNumber(0));
   }
 
@@ -67,7 +61,7 @@ const dexterCalculations = (function (undefined) {
    * @param {BigNumber} y
    * @returns {BigNumber} if rem(x,y) > 0 then (x/y+1) else (x/y)
    */
-  function ceilingDiv(x: BigNumber, y: BigNumber): BigNumber {
+  ceilingDiv(x: BigNumber, y: BigNumber): BigNumber {
     const result = x.mod(y);
     if (result.isGreaterThanOrEqualTo(new BigNumber(0))) {
       return x.dividedBy(y).plus(new BigNumber(1));
@@ -81,7 +75,7 @@ const dexterCalculations = (function (undefined) {
    * @param {BigNumber} xtzPool
    * @returns {BigNumber} xtzPool + 2_500_000
    */
-  function creditSubsidy(xtzPool: BigNumber): BigNumber {
+  creditSubsidy(xtzPool: BigNumber): BigNumber {
     return xtzPool.plus(new BigNumber(2_500_000));
   }
 
@@ -104,25 +98,24 @@ const dexterCalculations = (function (undefined) {
    * @returns {(BigNumber|null)} The amount of token that Dexter will send to the :to address in the dexter xtzToToken entrypoint.
    */
 
-  function xtzToTokenTokenOutput(
+  xtzToTokenTokenOutput(
     xtzIn: numericInput,
     xtzPool: numericInput,
     tokenPool: numericInput,
-    feePercent: number,
-    burnPercent: number,
-    includeSubsidy: boolean
+    feePercent?: number,
+    burnPercent?: number
   ): BigNumber | null {
     // TODO: check the line below
     //const xtzPool = xtzPool;
-    if (includeSubsidy) {
-      xtzPool = creditSubsidy(new BigNumber(xtzPool));
+    if (this.isLbContract) {
+      xtzPool = this.creditSubsidy(new BigNumber(xtzPool));
     }
 
     let xtzIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
     let tokenPool_ = new BigNumber(0);
-    const fee = 1000 - Math.floor(feePercent * 10);
-    const burn = 1000 - Math.floor(burnPercent * 10);
+    const fee = feePercent ? 1000 - Math.floor(feePercent * 10) : 1000;
+    const burn = burnPercent ? 1000 - Math.floor(burnPercent * 10) : 1000;
     const feeMultiplier = fee * burn;
 
     try {
@@ -132,7 +125,11 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (gtZero(xtzIn_) && gtZero(xtzPool_) && gtZero(tokenPool_)) {
+    if (
+      this.gtZero(xtzIn_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_)
+    ) {
       // Includes constiable fee (0.1% for LB, 0.3 for Quipu) and constiable burn (0.1% for LB, 0% for Quipu) calculated separatedly: e.g. 0.1% for both:  999/1000 * 999/1000 = 998100/1000000
       // (xtzIn_ * tokenPool_ * 999 * 999) / (tokenPool * 1000 - tokenOut * 999 * 999)
       const numerator = xtzIn_
@@ -161,18 +158,17 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} The amount of XTZ the user must send to xtzToToken to get the tokenOut amount.
    */
-  function xtzToTokenXtzInput(
+  xtzToTokenXtzInput(
     tokenOut: numericInput,
     xtzPool: numericInput,
     tokenPool: numericInput,
     decimals: numericInput,
     feePercent: number,
-    burnPercent: number,
-    includeSubsidy: boolean
+    burnPercent: number
   ): BigNumber | null {
     //const xtzPool = xtzPool;
-    if (includeSubsidy) {
-      xtzPool = creditSubsidy(new BigNumber(xtzPool));
+    if (this.isLbContract) {
+      xtzPool = this.creditSubsidy(new BigNumber(xtzPool));
     }
 
     let tokenOut_ = new BigNumber(0);
@@ -193,10 +189,10 @@ const dexterCalculations = (function (undefined) {
     }
 
     if (
-      gtZero(tokenOut_) &&
-      gtZero(xtzPool_) &&
-      gtZero(tokenPool_) &&
-      geqZero(decimals_)
+      this.gtZero(tokenOut_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_) &&
+      this.geqZero(decimals_)
     ) {
       // Includes constiable fee (0.1% for LB, 0.3 for Quipu) and constiable burn (0.1% for LB, 0% for Quipu) calculated separatedly: e.g. 0.1% for both:  999/1000 * 999/1000 = 998100/1000000
       // (xtzPool_ * tokenOut_ * 1000 * 1000 * 10 ** decimals) / (tokenPool - tokenOut * 999 * 999 * 10 ** decimals))
@@ -214,7 +210,7 @@ const dexterCalculations = (function (undefined) {
             )
         );
 
-      if (gtZero(result)) {
+      if (this.gtZero(result)) {
         return result;
       }
       return null;
@@ -235,13 +231,12 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} The exchange rate as a float number.
    */
-  function xtzToTokenExchangeRate(
+  xtzToTokenExchangeRate(
     xtzIn: numericInput,
     xtzPool: numericInput,
     tokenPool: numericInput,
     feePercent: number,
-    burnPercent: number,
-    includeSubsidy: boolean
+    burnPercent: number
   ): BigNumber | null {
     let xtzIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -253,14 +248,17 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (gtZero(xtzIn_) && gtZero(xtzPool_) && gtZero(tokenPool_)) {
-      const tokenOutput = xtzToTokenTokenOutput(
+    if (
+      this.gtZero(xtzIn_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_)
+    ) {
+      const tokenOutput = this.xtzToTokenTokenOutput(
         xtzIn_,
         xtzPool_,
         tokenPool_,
         feePercent,
-        burnPercent,
-        includeSubsidy
+        burnPercent
       );
       if (tokenOutput === null) return null;
 
@@ -282,14 +280,13 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} The exchange rate as a float number.
    */
-  function xtzToTokenExchangeRateForDisplay(
+  xtzToTokenExchangeRateForDisplay(
     xtzIn: numericInput,
     xtzPool: numericInput,
     tokenPool: numericInput,
     decimals: numericInput,
     feePercent: number,
-    burnPercent: number,
-    includeSubsidy: boolean
+    burnPercent: number
   ): BigNumber | null {
     let xtzIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -301,14 +298,17 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (gtZero(xtzIn_) && gtZero(xtzPool_) && gtZero(tokenPool_)) {
-      const tokenOutput = xtzToTokenTokenOutput(
+    if (
+      this.gtZero(xtzIn_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_)
+    ) {
+      const tokenOutput = this.xtzToTokenTokenOutput(
         xtzIn_,
         xtzPool_,
         tokenPool_,
         feePercent,
-        burnPercent,
-        includeSubsidy
+        burnPercent
       );
       if (tokenOutput === null) return null;
 
@@ -331,7 +331,7 @@ const dexterCalculations = (function (undefined) {
    * @param {(BigNumber|number|string)} decimals - The number of decimals a token has. Must be greater than or equal to zero.
    * @returns {(BigNumber|null)} The market rate as a float value.
    */
-  function xtzToTokenMarketRate(
+  xtzToTokenMarketRate(
     xtzPool: numericInput,
     tokenPool: numericInput,
     decimals: numericInput
@@ -346,7 +346,11 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (gtZero(xtzPool_) && gtZero(tokenPool_) && geqZero(decimals_)) {
+    if (
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_) &&
+      this.geqZero(decimals_)
+    ) {
       let xtzPool__ = xtzPool_.times(Math.pow(10, -6));
       let tokenPool__ = tokenPool_.times(Math.pow(10, -decimals_.toNumber()));
       return tokenPool__.dividedBy(xtzPool__);
@@ -366,12 +370,11 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} - The price impact percentage as a float value.
    */
-  function xtzToTokenPriceImpact(
+  xtzToTokenPriceImpact(
     xtzIn: numericInput,
     xtzPool: numericInput,
     tokenPool: numericInput,
-    burnPercent: number,
-    includeSubsidy: number
+    burnPercent: number
   ): BigNumber | null {
     let xtzIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -385,18 +388,22 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (includeSubsidy) {
-      xtzPool_ = creditSubsidy(xtzPool_);
+    if (this.isLbContract) {
+      xtzPool_ = this.creditSubsidy(xtzPool_);
     }
 
-    if (gtZero(xtzIn_) && gtZero(xtzPool_) && gtZero(tokenPool_)) {
+    if (
+      this.gtZero(xtzIn_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_)
+    ) {
       const midPrice = tokenPool_.times(xtzPool_);
       const xtzInNetBurn = xtzIn_.times(burn).dividedBy(1000);
       const tokensBought = xtzInNetBurn
         .times(tokenPool_)
         .dividedBy(xtzInNetBurn.plus(xtzPool_));
       // if no tokens have been purchased then there is no price impact
-      if (leqZero(tokensBought)) {
+      if (this.leqZero(tokensBought)) {
         return new BigNumber(0);
       }
       const exactQuote = midPrice.times(xtzIn_);
@@ -416,7 +423,7 @@ const dexterCalculations = (function (undefined) {
    * @param {number} allowedSlippage - Maximum slippage rate that a user will except for an exchange. Must be between 0.00 and 1.00.
    * @returns {(BigNumber|null)} The minimum token amount to send to the xtzToToken entrypoint.
    */
-  function xtzToTokenMinimumTokenOutput(
+  xtzToTokenMinimumTokenOutput(
     tokenOut: numericInput,
     allowedSlippage: number
   ): BigNumber | null {
@@ -444,14 +451,14 @@ const dexterCalculations = (function (undefined) {
    * @param {(BigNumber|number|string)} xtzIn The amount of XTZ sold to dexter. Must be greater than zero.
    * @returns {(BigNumber|null)} The fee paid to the dexter liquidity providers.
    */
-  function totalLiquidityProviderFee(xtzIn: BigNumber): BigNumber | null {
+  totalLiquidityProviderFee(xtzIn: BigNumber): BigNumber | null {
     let xtzIn_ = new BigNumber(0);
     try {
       xtzIn_ = new BigNumber(xtzIn);
     } catch (err) {
       return null;
     }
-    if (gtZero(xtzIn_)) {
+    if (this.gtZero(xtzIn_)) {
       return new BigNumber(xtzIn_).times(new BigNumber(1)).dividedBy(1000);
     } else {
       return null;
@@ -465,7 +472,7 @@ const dexterCalculations = (function (undefined) {
    * @param {(BigNumber|number|string)} xtzIn - The amount of XTZ sold to dexter. Must be greater than zero.
    * @returns {(BigNumber|null)} The fee paid to an individual dexter liquidity provider.
    */
-  function liquidityProviderFee(
+  liquidityProviderFee(
     xtzIn: numericInput,
     totalLiquidity: numericInput,
     userLiquidity: numericInput
@@ -480,8 +487,12 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (gtZero(xtzIn_) && gtZero(totalLiquidity_) && gtZero(userLiquidity_)) {
-      const fee = totalLiquidityProviderFee(xtzIn_);
+    if (
+      this.gtZero(xtzIn_) &&
+      this.gtZero(totalLiquidity_) &&
+      this.gtZero(userLiquidity_)
+    ) {
+      const fee = this.totalLiquidityProviderFee(xtzIn_);
       if (fee === null) return null;
 
       return fee.dividedBy(totalLiquidity_.dividedBy(userLiquidity_));
@@ -509,13 +520,12 @@ const dexterCalculations = (function (undefined) {
    * @returns {(BigNumber|null)} The amount of XTZ that Dexter will send to the :to
    * address in the dexter tokenToXtz entrypoint.
    */
-  function tokenToXtzXtzOutput(
+  tokenToXtzXtzOutput(
     tokenIn: numericInput,
     xtzPool: numericInput,
     tokenPool: numericInput,
     feePercent: number,
-    burnPercent: number,
-    includeSubsidy: boolean
+    burnPercent: number
   ): BigNumber | null {
     let tokenIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -532,10 +542,14 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (includeSubsidy) {
-      xtzPool_ = creditSubsidy(xtzPool_);
+    if (this.isLbContract) {
+      xtzPool_ = this.creditSubsidy(xtzPool_);
     }
-    if (gtZero(tokenIn_) && gtZero(xtzPool_) && gtZero(tokenPool_)) {
+    if (
+      this.gtZero(tokenIn_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_)
+    ) {
       // Includes constiable fee (0.1% for LB, 0.3 for Quipu) and constiable burn (0.1% for LB, 0% for Quipu) calculated separatedly: e.g. 0.1% for both:  999/1000 * 999/1000 = 998100/1000000
       const numerator = new BigNumber(tokenIn)
         .times(new BigNumber(xtzPool))
@@ -563,14 +577,13 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} The amount of token the user must send to tokenToXtz to get the xtzOut amount.
    */
-  function tokenToXtzTokenInput(
+  tokenToXtzTokenInput(
     xtzOut: BigNumber,
     xtzPool: numericInput,
     tokenPool: numericInput,
     decimals: BigNumber,
     feePercent: number,
-    burnPercent: number,
-    includeSubsidy: boolean
+    burnPercent: number
   ): BigNumber | null {
     let xtzOut_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -589,14 +602,14 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (includeSubsidy) {
-      xtzPool_ = creditSubsidy(xtzPool_);
+    if (this.isLbContract) {
+      xtzPool_ = this.creditSubsidy(xtzPool_);
     }
     if (
-      gtZero(xtzOut_) &&
-      gtZero(xtzPool_) &&
-      gtZero(tokenPool_) &&
-      geqZero(decimals_)
+      this.gtZero(xtzOut_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_) &&
+      this.geqZero(decimals_)
     ) {
       // Includes constiable fee (0.1% for LB, 0.3 for Quipu) and constiable burn (0.1% for LB, 0% for Quipu) calculated separatedly: e.g. 0.1% for both:  999/1000 * 999/1000 = 998100/1000000
       // (tokenPool_ * xtzOut_ * 1000 * 1000 * 10 ** decimals) / ((xtzPool * 999 * 1000 - xtzOut * 999 * 999) * 10 ** decimals))
@@ -611,7 +624,7 @@ const dexterCalculations = (function (undefined) {
             .times(Math.pow(10, decimals_.toNumber()))
         );
 
-      if (gtZero(result)) {
+      if (this.gtZero(result)) {
         return result;
       }
       return null;
@@ -632,13 +645,12 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} The exchange rate as a float number.
    */
-  function tokenToXtzExchangeRate(
+  tokenToXtzExchangeRate(
     tokenIn: numericInput,
     xtzPool: numericInput,
     tokenPool: numericInput,
     feePercent: number,
-    burnPercent: number,
-    includeSubsidy: boolean
+    burnPercent: number
   ): BigNumber | null {
     let tokenIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -650,14 +662,17 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (gtZero(tokenIn_) && gtZero(xtzPool_) && gtZero(tokenPool_)) {
-      const tokenOutput = tokenToXtzXtzOutput(
+    if (
+      this.gtZero(tokenIn_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_)
+    ) {
+      const tokenOutput = this.tokenToXtzXtzOutput(
         tokenIn_,
         xtzPool_,
         tokenPool_,
         feePercent,
-        burnPercent,
-        includeSubsidy
+        burnPercent
       );
       if (tokenOutput === null) return null;
 
@@ -679,14 +694,13 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} The exchange rate as a float number.
    */
-  function tokenToXtzExchangeRateForDisplay(
+  tokenToXtzExchangeRateForDisplay(
     tokenIn: numericInput,
     xtzPool: numericInput,
     tokenPool: numericInput,
     decimals: BigNumber,
     feePercent: number,
-    burnPercent: number,
-    includeSubsidy: boolean
+    burnPercent: number
   ): BigNumber | null {
     let tokenIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -698,14 +712,17 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (gtZero(tokenIn_) && gtZero(xtzPool_) && gtZero(tokenPool_)) {
-      const tokenOutput = tokenToXtzXtzOutput(
+    if (
+      this.gtZero(tokenIn_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_)
+    ) {
+      const tokenOutput = this.tokenToXtzXtzOutput(
         tokenIn_,
         xtzPool_,
         tokenPool_,
         feePercent,
-        burnPercent,
-        includeSubsidy
+        burnPercent
       );
       if (tokenOutput === null) return null;
 
@@ -728,7 +745,7 @@ const dexterCalculations = (function (undefined) {
    * @param {(BigNumber|number|string)} decimals - The number of decimals a token has. Must be greater than or equal to zero.
    * @returns {(BigNumber|null)} The market rate as a float value.
    */
-  function tokenToXtzMarketRate(
+  tokenToXtzMarketRate(
     xtzPool: numericInput,
     tokenPool: numericInput,
     decimals: numericInput
@@ -743,7 +760,11 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (gtZero(xtzPool_) && gtZero(tokenPool_) && geqZero(decimals_)) {
+    if (
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_) &&
+      this.geqZero(decimals_)
+    ) {
       let xtzPool__ = xtzPool_.times(Math.pow(10, -6));
       let tokenPool__ = tokenPool_.times(Math.pow(10, -decimals_.toNumber()));
       return xtzPool__.dividedBy(tokenPool__);
@@ -763,12 +784,11 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} - The price impact percentage as a float value.
    */
-  function tokenToXtzPriceImpact(
+  tokenToXtzPriceImpact(
     tokenIn: numericInput,
     xtzPool: numericInput,
     tokenPool: numericInput,
-    burnPercent: number,
-    includeSubsidy: boolean
+    burnPercent: number
   ): BigNumber | null {
     let tokenIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -782,10 +802,14 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (includeSubsidy) {
-      xtzPool_ = creditSubsidy(xtzPool_);
+    if (this.isLbContract) {
+      xtzPool_ = this.creditSubsidy(xtzPool_);
     }
-    if (gtZero(tokenIn_) && gtZero(xtzPool_) && gtZero(tokenPool_)) {
+    if (
+      this.gtZero(tokenIn_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_)
+    ) {
       const midPrice = xtzPool_.dividedBy(tokenPool_);
       const xtzBought = tokenIn_
         .times(xtzPool_)
@@ -794,7 +818,7 @@ const dexterCalculations = (function (undefined) {
         .times(new BigNumber(burn))
         .dividedBy(new BigNumber(1000));
       // if no tokens have been purchased then there is no price impact
-      if (leqZero(xtzBoughtNetBurn)) {
+      if (this.leqZero(xtzBoughtNetBurn)) {
         return new BigNumber(0);
       }
       const exactQuote = midPrice.times(tokenIn_);
@@ -814,12 +838,12 @@ const dexterCalculations = (function (undefined) {
    * @param {number} allowedSlippage - Maximum slippage rate that a user will except for an exchange. Must be between 0.00 and 1.00.
    * @returns {(BigNumber|null)} The minimum token amount to send to the tokenToXtz entrypoint.
    */
-  function tokenToXtzMinimumXtzOutput(
+  tokenToXtzMinimumXtzOutput(
     xtzOut: BigNumber,
     allowedSlippage: number
   ): BigNumber | null {
     if (
-      gtZero(new BigNumber(xtzOut)) &&
+      this.gtZero(new BigNumber(xtzOut)) &&
       allowedSlippage >= 0.0 &&
       allowedSlippage <= 1.0
     ) {
@@ -854,11 +878,10 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} The amount of liquidity that the sender gains.
    */
-  function addLiquidityLiquidityCreated(
+  addLiquidityLiquidityCreated(
     xtzIn: numericInput,
     xtzPool: numericInput,
-    totalLiquidity: numericInput,
-    includeSubsidy: boolean
+    totalLiquidity: numericInput
   ): BigNumber | null {
     let xtzIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -870,15 +893,15 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (includeSubsidy) {
-      xtzPool_ = creditSubsidy(xtzPool_);
+    if (this.isLbContract) {
+      xtzPool_ = this.creditSubsidy(xtzPool_);
     }
-    if (gtZero(xtzIn_) && gtZero(xtzPool_)) {
-      if (eqZero(totalLiquidity_)) {
+    if (this.gtZero(xtzIn_) && this.gtZero(xtzPool_)) {
+      if (this.eqZero(totalLiquidity_)) {
         return new BigNumber(xtzIn)
           .times(new BigNumber(totalLiquidity))
           .dividedBy(new BigNumber(xtzPool));
-      } else if (gtZero(totalLiquidity_)) {
+      } else if (this.gtZero(totalLiquidity_)) {
         return new BigNumber(xtzIn)
           .times(new BigNumber(totalLiquidity))
           .dividedBy(new BigNumber(xtzPool));
@@ -901,11 +924,10 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} The amount of liquidity that the sender gains.
    */
-  function addLiquidityTokenIn(
+  addLiquidityTokenIn(
     xtzIn: numericInput,
     xtzPool: numericInput,
-    tokenPool: numericInput,
-    includeSubsidy: boolean
+    tokenPool: numericInput
   ): BigNumber | null {
     let xtzIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -917,12 +939,16 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (includeSubsidy) {
-      xtzPool_ = creditSubsidy(xtzPool_);
+    if (this.isLbContract) {
+      xtzPool_ = this.creditSubsidy(xtzPool_);
     }
-    if (gtZero(xtzIn_) && gtZero(xtzPool_) && gtZero(tokenPool_)) {
+    if (
+      this.gtZero(xtzIn_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_)
+    ) {
       // cdiv(xtzIn_ * tokenPool_, xtzPool_)
-      return ceilingDiv(xtzIn_.times(tokenPool_), xtzPool_);
+      return this.ceilingDiv(xtzIn_.times(tokenPool_), xtzPool_);
     } else {
       return null;
     }
@@ -940,11 +966,10 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {{BigNumber|null}} The amount of liquidity that the sender gains.
    */
-  function addLiquidityXtzIn(
+  addLiquidityXtzIn(
     tokenIn: numericInput,
     xtzPool: numericInput,
-    tokenPool: numericInput,
-    includeSubsidy: boolean
+    tokenPool: numericInput
   ): BigNumber | null {
     let tokenIn_ = new BigNumber(0);
     let xtzPool_ = new BigNumber(0);
@@ -956,10 +981,14 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (includeSubsidy) {
-      xtzPool_ = creditSubsidy(xtzPool_);
+    if (this.isLbContract) {
+      xtzPool_ = this.creditSubsidy(xtzPool_);
     }
-    if (gtZero(tokenIn_) && gtZero(xtzPool_) && gtZero(tokenPool_)) {
+    if (
+      this.gtZero(tokenIn_) &&
+      this.gtZero(xtzPool_) &&
+      this.gtZero(tokenPool_)
+    ) {
       // div(tokenIn_ * xtzPool_, tokenPool_)
       return tokenIn_.times(xtzPool_).dividedBy(tokenPool_);
     } else {
@@ -983,7 +1012,7 @@ const dexterCalculations = (function (undefined) {
    * @param {(BigNumber|number|string)} tokenPool amount of token that Dexter holds.
    * @returns {(BigNumber|null)} The amount of token that the sender gains.
    */
-  function removeLiquidityTokenOut(
+  removeLiquidityTokenOut(
     liquidityBurned: numericInput,
     totalLiquidity: numericInput,
     tokenPool: numericInput
@@ -999,9 +1028,9 @@ const dexterCalculations = (function (undefined) {
       return null;
     }
     if (
-      gtZero(liquidityBurned_) &&
-      gtZero(totalLiquidity_) &&
-      gtZero(tokenPool_)
+      this.gtZero(liquidityBurned_) &&
+      this.gtZero(totalLiquidity_) &&
+      this.gtZero(tokenPool_)
     ) {
       // tokenPool_ * liquidityBurned_ / totalLiquidity_
       return tokenPool_.times(liquidityBurned_).dividedBy(totalLiquidity_);
@@ -1021,11 +1050,10 @@ const dexterCalculations = (function (undefined) {
    * @param {boolean} includeSubsidy - In the case of liquidity baking, a subsudy will be added per block, affecting the calcualtion. This boolean is used to control whether or not this is taken into account.
    * @returns {(BigNumber|null)} The amount of XTZ that the sender gains.
    */
-  function removeLiquidityXtzOut(
+  removeLiquidityXtzOut(
     liquidityBurned: numericInput,
     totalLiquidity: numericInput,
-    xtzPool: numericInput,
-    includeSubsidy: boolean
+    xtzPool: numericInput
   ): BigNumber | null {
     let liquidityBurned_ = new BigNumber(0);
     let totalLiquidity_ = new BigNumber(0);
@@ -1037,13 +1065,13 @@ const dexterCalculations = (function (undefined) {
     } catch (err) {
       return null;
     }
-    if (includeSubsidy) {
-      xtzPool_ = creditSubsidy(xtzPool_);
+    if (this.isLbContract) {
+      xtzPool_ = this.creditSubsidy(xtzPool_);
     }
     if (
-      gtZero(liquidityBurned_) &&
-      gtZero(totalLiquidity_) &&
-      gtZero(xtzPool_)
+      this.gtZero(liquidityBurned_) &&
+      this.gtZero(totalLiquidity_) &&
+      this.gtZero(xtzPool_)
     ) {
       // xtzPool_ * liquidityBurned_ / totalLiquidity_
       return xtzPool_.times(liquidityBurned_).dividedBy(totalLiquidity_);
@@ -1051,8 +1079,28 @@ const dexterCalculations = (function (undefined) {
       return null;
     }
   }
+}
 
-  return {
+// NOT THE CLASS
+
+//const dexterCalculations = (function (undefined) {
+
+/**
+ * Many functions use {(BigNumber|number|string)} as parameter. These parameters
+ * are converted into bigInt from the big-integer package and are expected to
+ * to be non-negative numbers. string should be a string encoded integer. If you
+ * are interfacing this project from another programming language, you should
+ * pass the value for the parameter in {(BigNumber|number|string)} as a string to
+ * avoid number size restrictions in JavaScript.
+ */
+
+/**
+ * =============================================================================
+ * Internal utility functions
+ * =============================================================================
+ */
+
+/*return {
     // xtzToToken
     xtzToTokenTokenOutput: xtzToTokenTokenOutput,
     xtzToTokenXtzInput: xtzToTokenXtzInput,
@@ -1087,7 +1135,7 @@ const dexterCalculations = (function (undefined) {
 // Node.js check
 if (typeof module !== "undefined" && module.hasOwnProperty("exports")) {
   module.exports = dexterCalculations;
-}
+}*/
 
 // amd check
 /*if (typeof define === "function" && define.amd) {
